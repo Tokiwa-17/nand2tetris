@@ -7,6 +7,7 @@ public:
     void initializeSymbolTables();
     void showSymbolTables();
     void parseProg();
+    std::string initializeCinstruction(std::string, bool, bool, bool);
 
 private:
     int cntLines = 0;
