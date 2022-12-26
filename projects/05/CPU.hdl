@@ -40,4 +40,34 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
+    Not(in=instruction[15], out=Ainstruction);
+    Not(in=Ainstruction, out=Cinstruction);
+    And(a=Cinstruction, b=instruction[5], out=ALU2Areg);
+    Mux16(a=instruction, b=ALUOut, sel=ALU2Areg, out=o1);
+    Or(a=Ainstruction, b=ALU2Areg, out=loadA);
+    ARegister(in=o1, load=loadA, out=outA); 
+
+    And(a=Cinstruction, b=instruction[4], out=loadD);
+    DRegister(in=ALUOut, load=loadD, out=outD);
+
+    Mux16(a=outA, b=inM, sel=instruction[12], out=o3);
+
+    ALU(x=outD, y=o3, zx=instruction[11], nx=instruction[10], 
+        zy=instruction[9], ny=instruction[8], f=instruction[7],
+        no=instruction[6], out=ALUOut, zr=zrout, ng=ngout);
+
+    Or16(a=false, b=outA, out[0..14]=addressM);
+    Or16(a=false, b=ALUOut, out=outM);
+    And(a=Cinstruction, b=instruction[3], out=writeM);
+
+    And(a=zrout, b=instruction[1], out=jeq);    // is zero and jump if zero
+    And(a=ngout, b=instruction[2], out=jlt);    // is neg and jump if neg
+    Or(a=zrout, b=ngout, out=zeroOrNeg);
+    Not(in=zeroOrNeg, out=positive);
+    And(a=positive, b=instruction[0], out=jgt);
+    Or(a=jeq, b=jlt, out=jle);
+    Or(a=jle, b=jgt, out=jump);
+    And(a=Cinstruction, b=jump, out=pcload);
+    Not(in=pcload, out=inc);
+    PC(in=outA, load=pcload, inc=inc, reset=reset, out[0..14]=pc);
 }
