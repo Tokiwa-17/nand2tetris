@@ -29,6 +29,12 @@ void Parser::showSymbolTables() {
     }
 }
 
+void Parser::showInstructions() {
+    for (auto el : instructions) {
+        std::cout << el.first << " " << el.second << std::endl; 
+    }
+}
+
 std::string Parser::initializeCinstruction(std::string s, bool comp, bool dest, bool jump) {
     if (comp) {
         if (s == "0")       return "0101010";
@@ -80,26 +86,93 @@ std::string Parser::initializeCinstruction(std::string s, bool comp, bool dest, 
     }
 }
 
-Parser::Parser() : cntLines(0) {
+std::string& trim(std::string &s) {
+    if (!s.empty()) {
+        s.erase(0, s.find_first_not_of(" "));
+        s.erase(s.find_last_not_of(" ") + 1);
+    }
+    return s;
+}
+
+Parser::Parser() : cntLines(0), varNum(0) {
+    Parser::initializeSymbolTables();
     std::ifstream ifs;
-    ifs.open("/home/ylf/nand2tetris/projects/06/src/Add.asm", std::ifstream::in);
+    ifs.open("/home/ylf/nand2tetris/projects/06/max/Max.asm", std::ifstream::in);
     if (!ifs.is_open()) return;
+
+    // First Pass
     std::string line;
+    cntLines = 0;
+
     while(std::getline(ifs, line)) {
-        if(line == "\r") continue;
-        if(line.length() > 2 && line[0] == '/' && line[1] == '/') continue;
+        line = trim(line);
+        int length = line.length();
+        if (line == "") continue;
+        else if (line.length() > 2 && line[0] == '/' && line[1] == '/') continue; 
+        else if (length > 1 && line[0] == '(') {
+            std::string symbol = line.substr(1, length - 2);
+            //std::cout << symbol << std::endl;
+            symbolTables[symbol] = cntLines;
+        } 
+        else cntLines++;
+    }
+    ifs.clear();
+    ifs.seekg(0, std::ios::beg);
+    cntLines = 0;
+
+    // Second Pass
+    while(std::getline(ifs, line)) {
+        line = trim(line);
+        if (line == "") continue;
+        if (line.length() > 2 && line[0] == '/' && line[1] == '/') continue; 
+        int length = line.length();
+        if (line[0] == '@') {
+            int len = line.length() - 1;
+            std::string var = line.substr(1, len);
+            try {
+                std::stoi(var);
+            } catch(...) {
+                if (symbolTables.count(var)) continue;
+                symbolTables[var] = varNum++;
+                //std::cout << var << std::endl;
+            }
+        }
+        cntLines++;
+    }
+    ifs.clear();
+    ifs.seekg(0, std::ios::beg);
+    cntLines = 0;
+
+    while(std::getline(ifs, line)) {
+        if (line.find("//") != line.npos) 
+            line = line.substr(0, line.find("//"));
+        line = trim(line);
+        if (line == "") continue;
+        if (line.length() > 1 && line[0] == '(') continue;
+        if (line.length() > 2 && line[0] == '/' && line[1] == '/') continue;
+        if (line.find("//") != line.npos) 
+            line = line.substr(0, line.find("//"));
         //std::cout << line << std::endl;
+        if (line[0] == '@') {
+           int len = line.length() - 1;
+            std::string var = line.substr(1, len);
+            try {
+                std::stoi(var);
+            } catch(...) {
+               line = "@" + std::to_string(symbolTables[var]);
+            } 
+        }
         instructions[cntLines++] = line;
     }
-    Parser::initializeSymbolTables();
-    //Parser::showSymbolTables();
+    // Parser::showSymbolTables();
+    // Parser::showInstructions();
 }
 
 void Parser::parseProg() {
     for (int i = 0; i < cntLines; i ++) {
         std::string ins = instructions[i];
         if (ins[0] == '@') { // A instruction
-            int len = ins.length() - 2;
+            int len = ins.length() - 1;
             int num = std::stoi(ins.substr(1, len));
             const int n = 15;
             std::string bin = std::bitset<n>(num).to_string();
@@ -108,15 +181,19 @@ void Parser::parseProg() {
         } else {             // C instruction
             if (ins.find("=") != ins.npos) {
                 int pos = ins.find("=");
-                std::string ins_ = ins.substr(0, ins.length() - 1);
-                std::string dest = ins_.substr(0, pos);
-                std::string comp = ins_.substr(pos + 1);
+                std::string dest = ins.substr(0, pos);
+                std::string comp = ins.substr(pos + 1, ins.length() - pos - 1);
                 //std::cout << dest << " " << comp << std::endl;
                 std::cout << "111" + Parser::initializeCinstruction(comp, true, false, false) + 
                 Parser::initializeCinstruction(dest, false, true, false) + "000" << std::endl;
             }
-            if (ins.find(";") != ins.npos) {
-
+            else if (ins.find(";") != ins.npos) {
+               int pos = ins.find(";");
+                std::string comp = ins.substr(0, pos);
+                std::string jump = ins.substr(pos + 1, ins.length() - pos - 1);
+                //std::cout << dest << " " << comp << std::endl;
+                std::cout << "111" + Parser::initializeCinstruction(comp, true, false, false) + "000" +
+                Parser::initializeCinstruction(jump, false, false, true) << std::endl; 
             }
         }
     }
